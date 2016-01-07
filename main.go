@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"os/signal"
+	"syscall"
 	"flag"
 	"time"
 	"github.com/artd-status-updater/statusupdater"
@@ -37,19 +38,23 @@ func main() {
 	}
 
 	dataChan := make(chan string)
+	errorChan := make(chan error)
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
+	signal.Notify(signalChan, syscall.SIGTERM)
 
-	dataListener, err := status_updater.NewDataListener(unixSocketPath, dataChan)
+	dataListener, err := status_updater.NewDataListener(unixSocketPath, dataChan, errorChan)
 	if err != nil {
 		panic(err)
 	}
-	keyUpdater := status_updater.NewKeyUpdater(&keyUpdaterParams, etcdKApi, dataChan);
+	keyUpdater := status_updater.NewKeyUpdater(&keyUpdaterParams, etcdKApi, dataChan, errorChan);
 
 	go dataListener.Start()
 	go keyUpdater.Start()
 
 	select {
+	case err = <-errorChan:
+		panic(err)
 	case <-signalChan:
 		dataListener.Stop()
 		keyUpdater.Stop()

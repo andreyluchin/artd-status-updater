@@ -21,8 +21,8 @@ type KeyUpdater struct {
 	ErrorChan  chan error
 }
 
-func NewKeyUpdater(params *KeyUpdaterParameters, etcdKApi client.KeysAPI, dataChan chan string) (*KeyUpdater) {
-	return &KeyUpdater{params, etcdKApi, nil, "", dataChan, make(chan error)}
+func NewKeyUpdater(params *KeyUpdaterParameters, etcdKApi client.KeysAPI, dataChan chan string, errorChan chan error) (*KeyUpdater) {
+	return &KeyUpdater{params, etcdKApi, nil, "", dataChan, errorChan}
 }
 
 func (u *KeyUpdater) updateStatus() {

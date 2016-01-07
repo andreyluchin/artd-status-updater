@@ -1,50 +1,45 @@
 package status_updater
 
 import (
-	//"log"
 	"net"
-	//"io/ioutil"
 	"bytes"
 )
 
 type DataListener struct {
-	listener net.Listener
-	dataChan chan string
+	listener  net.Listener
+	dataChan  chan string
+	errorChan chan error
 }
 
-func NewDataListener(socketPath string, dataChan chan string) (*DataListener, error) {
+func NewDataListener(socketPath string, dataChan chan string, errorChan chan error) (*DataListener, error) {
 	ln, err := net.Listen("unix", socketPath)
 	if err != nil {
 		return nil, err
 	}
 
-	return &DataListener{ln, dataChan}, nil
+	return &DataListener{ln, dataChan, errorChan}, nil
 }
 
 func (l *DataListener) handleConnection(conn net.Conn) {
-	// data, err := ioutil.ReadAll(conn);
-
-	buf := bytes.NewBuffer(make([]byte, 0, 512))
+	buf := bytes.NewBuffer(make([]byte, 0, bytes.MinRead))
 
 	_, err := buf.ReadFrom(conn)
-	// return buf.Bytes(), err
+	conn.Close()
 
 	if err != nil {
+		l.errorChan <- err
 		return
 	}
 
-	conn.Close()
-
-	// l.dataChan <- string(data[:])
 	l.dataChan <- buf.String()
 }
 
-func (l *DataListener) Start() error {
+func (l *DataListener) Start() {
 	for {
 		conn, err := l.listener.Accept()
 		if err != nil {
-			return err
-			// log.Fatal("get client connection error: ", err)
+			l.errorChan <- err
+			return
 		}
 
 		go l.handleConnection(conn)
