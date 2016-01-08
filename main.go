@@ -40,8 +40,7 @@ func main() {
 	dataChan := make(chan string)
 	errorChan := make(chan error)
 	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
-	signal.Notify(signalChan, syscall.SIGTERM)
+	signal.Notify(signalChan, os.Interrupt, os.Kill, syscall.SIGTERM)
 
 	dataListener, err := status_updater.NewDataListener(unixSocketPath, dataChan, errorChan)
 	if err != nil {
