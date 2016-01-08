@@ -4,7 +4,6 @@ import (
 	"time"
 	"github.com/coreos/etcd/client"
 	"github.com/coreos/etcd/Godeps/_workspace/src/golang.org/x/net/context"
-	"fmt"
 )
 
 type KeyUpdaterParameters struct {
@@ -20,12 +19,11 @@ type KeyUpdater struct {
 	polTimer   *time.Timer
 	lastStatus string
 	DataChan   chan string
-	ErrorChan  chan error
 	stopChan   chan bool
 }
 
-func NewKeyUpdater(params *KeyUpdaterParameters, etcdKApi client.KeysAPI, dataChan chan string, errorChan chan error) (*KeyUpdater) {
-	return &KeyUpdater{params, etcdKApi, nil, "", dataChan, errorChan, make(chan bool, 1)}
+func NewKeyUpdater(params *KeyUpdaterParameters, etcdKApi client.KeysAPI, dataChan chan string) (*KeyUpdater) {
+	return &KeyUpdater{params, etcdKApi, nil, "", dataChan, make(chan bool, 1)}
 }
 
 func (u *KeyUpdater) updateStatus() (time.Duration, error) {
@@ -47,7 +45,6 @@ func (u *KeyUpdater) updateLoop() {
 
 		duration := u.params.UpdateFreq
 		if err != nil {
-			u.ErrorChan <- err
 			// in case of error retry
 			duration = u.params.RetryFreq
 		}

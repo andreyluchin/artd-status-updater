@@ -57,9 +57,8 @@ func main() {
 	}
 
 	// start key updater
-	keyUpdater := status_updater.NewKeyUpdater(keyUpdaterParams, etcdKApi, dataChan, make(chan error));
+	keyUpdater := status_updater.NewKeyUpdater(keyUpdaterParams, etcdKApi, dataChan);
 	keyUpdater.Start()
-
 
 	select {
 	case err = <-errorChan:
