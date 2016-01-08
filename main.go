@@ -9,7 +9,7 @@ import (
 	"github.com/artd-status-updater/statusupdater"
 )
 
-func main() {
+func parseArguments() (string, *status_updater.EtcdConnectionParams, *status_updater.KeyUpdaterParameters) {
 	var unixSocketPath string
 	etcdParams := status_updater.EtcdConnectionParams{}
 	keyUpdaterParams := status_updater.KeyUpdaterParameters{}
@@ -28,11 +28,18 @@ func main() {
 	// Key updater parameters
 	flag.StringVar(&keyUpdaterParams.Key, "key", "/artifact-downloader/status", "Key where to push status")
 	flag.DurationVar(&keyUpdaterParams.KeyTTL, "key-ttl", 10 * time.Second, "TTL for status key")
+	flag.DurationVar(&keyUpdaterParams.RetryFreq, "key-retry-freq", 1 * time.Second, "Key update retry update freq")
 	flag.DurationVar(&keyUpdaterParams.UpdateFreq, "key-update-freq", 5 * time.Second, "Key update freq")
 
 	flag.Parse()
 
-	etcdKApi, err := status_updater.MakeNewEtcdKApi(&etcdParams)
+	return unixSocketPath, &etcdParams, &keyUpdaterParams
+}
+
+func main() {
+	unixSocketPath, etcdParams, keyUpdaterParams := parseArguments()
+
+	etcdKApi, err := status_updater.MakeNewEtcdKApi(etcdParams)
 	if err != nil {
 		panic(err)
 	}
@@ -42,14 +49,17 @@ func main() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, os.Kill, syscall.SIGTERM)
 
-	dataListener, err := status_updater.NewDataListener(unixSocketPath, dataChan, errorChan)
+	dataListener := status_updater.NewDataListener(unixSocketPath, dataChan, errorChan)
+	// start server
+	err = dataListener.Start()
 	if err != nil {
 		panic(err)
 	}
-	keyUpdater := status_updater.NewKeyUpdater(&keyUpdaterParams, etcdKApi, dataChan, errorChan);
 
-	go dataListener.Start()
-	go keyUpdater.Start()
+	// start key updater
+	keyUpdater := status_updater.NewKeyUpdater(keyUpdaterParams, etcdKApi, dataChan, make(chan error));
+	keyUpdater.Start()
+
 
 	select {
 	case err = <-errorChan:

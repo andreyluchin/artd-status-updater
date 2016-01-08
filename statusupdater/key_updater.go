@@ -1,14 +1,16 @@
 package status_updater
 
 import (
-	"github.com/coreos/etcd/client"
-	"golang.org/x/net/context"
 	"time"
+	"github.com/coreos/etcd/client"
+	"github.com/coreos/etcd/Godeps/_workspace/src/golang.org/x/net/context"
+	"fmt"
 )
 
 type KeyUpdaterParameters struct {
 	Key        string
 	KeyTTL     time.Duration
+	RetryFreq  time.Duration
 	UpdateFreq time.Duration
 }
 
@@ -19,15 +21,16 @@ type KeyUpdater struct {
 	lastStatus string
 	DataChan   chan string
 	ErrorChan  chan error
+	stopChan   chan bool
 }
 
 func NewKeyUpdater(params *KeyUpdaterParameters, etcdKApi client.KeysAPI, dataChan chan string, errorChan chan error) (*KeyUpdater) {
-	return &KeyUpdater{params, etcdKApi, nil, "", dataChan, errorChan}
+	return &KeyUpdater{params, etcdKApi, nil, "", dataChan, errorChan, make(chan bool, 1)}
 }
 
-func (u *KeyUpdater) updateStatus() {
+func (u *KeyUpdater) updateStatus() (time.Duration, error) {
 	if u.lastStatus == "" {
-		u.waitForDataOrTimeout(0)
+		return 0, nil
 	}
 
 	start := time.Now()
@@ -35,34 +38,49 @@ func (u *KeyUpdater) updateStatus() {
 	setOptions := client.SetOptions{TTL: u.params.KeyTTL}
 	_, err := u.etcdKApi.Set(context.Background(), u.params.Key, u.lastStatus, &setOptions)
 
-	if err != nil {
-		u.ErrorChan <- err
-		return
-	}
-
-	u.waitForDataOrTimeout(time.Since(start))
+	return time.Since(start), err
 }
 
-func (u *KeyUpdater) waitForDataOrTimeout(timeOffset time.Duration) {
-	duration := u.params.UpdateFreq - timeOffset
-	if u.polTimer != nil {
-		u.polTimer.Reset(duration)
-	} else {
-		u.polTimer = time.NewTimer(duration)
-	}
+func (u *KeyUpdater) updateLoop() {
+	for {
+		updateDuration, err := u.updateStatus()
 
-	select {
-	case <-u.polTimer.C:
-		u.updateStatus()
-	case u.lastStatus = <-u.DataChan:
-		u.polTimer.Stop()
-		u.updateStatus()
+		duration := u.params.UpdateFreq
+		if err != nil {
+			u.ErrorChan <- err
+			// in case of error retry
+			duration = u.params.RetryFreq
+		}
+
+		duration -= updateDuration
+
+		if u.polTimer != nil {
+			u.polTimer.Reset(duration)
+		} else {
+			u.polTimer = time.NewTimer(duration)
+		}
+
+		select {
+		case u.lastStatus = <-u.DataChan:
+			// new data arrived
+			u.polTimer.Stop()
+		case <-u.stopChan:
+			// Got stop signal
+			return
+		case <-u.polTimer.C:
+			// timeout reached
+		}
 	}
 }
 
 func (u *KeyUpdater) Start() {
-	// todo read prev value
-	u.waitForDataOrTimeout(0)
+	// try to recover old status in case of crash
+	getResponse, err := u.etcdKApi.Get(context.Background(), u.params.Key, &client.GetOptions{})
+	if err == nil {
+		u.lastStatus = getResponse.Node.Value;
+	}
+
+	go u.updateLoop()
 }
 
 func (u *KeyUpdater) Stop() error {
@@ -70,8 +88,12 @@ func (u *KeyUpdater) Stop() error {
 		u.polTimer.Stop()
 	}
 
-	deleteOptions := client.DeleteOptions{}
-	_, err := u.etcdKApi.Delete(context.Background(), u.params.Key, &deleteOptions)
+	u.stopChan <- true
+
+	var err error = nil
+	if u.lastStatus != "" {
+		_, err = u.etcdKApi.Delete(context.Background(), u.params.Key, &client.DeleteOptions{})
+	}
 
 	return err
 }

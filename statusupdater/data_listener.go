@@ -3,21 +3,20 @@ package status_updater
 import (
 	"net"
 	"bytes"
+	"os"
+	"errors"
+	"fmt"
 )
 
 type DataListener struct {
-	listener  net.Listener
-	dataChan  chan string
-	errorChan chan error
+	socketPath string
+	listener   net.Listener
+	dataChan   chan string
+	errorChan  chan error
 }
 
-func NewDataListener(socketPath string, dataChan chan string, errorChan chan error) (*DataListener, error) {
-	ln, err := net.Listen("unix", socketPath)
-	if err != nil {
-		return nil, err
-	}
-
-	return &DataListener{ln, dataChan, errorChan}, nil
+func NewDataListener(socketPath string, dataChan chan string, errorChan chan error) *DataListener {
+	return &DataListener{socketPath, nil, dataChan, errorChan}
 }
 
 func (l *DataListener) handleConnection(conn net.Conn) {
@@ -34,7 +33,30 @@ func (l *DataListener) handleConnection(conn net.Conn) {
 	l.dataChan <- buf.String()
 }
 
-func (l *DataListener) Start() {
+func (l *DataListener) initSocket() error {
+	var err error
+
+	if _, err = os.Stat(l.socketPath); !os.IsNotExist(err) {
+		// socket exists
+		c, err := net.Dial("unix", l.socketPath)
+		if err == nil {
+			c.Close();
+			// socket exists and listening
+			return errors.New(fmt.Sprintf("Socket %s already exists and listening", l.socketPath))
+		}
+
+		err = os.Remove(l.socketPath)
+		if err != nil {
+			return err
+		}
+	}
+
+	l.listener, err = net.Listen("unix", l.socketPath)
+
+	return err
+}
+
+func (l *DataListener) acceptConnections() {
 	for {
 		conn, err := l.listener.Accept()
 		if err != nil {
@@ -44,6 +66,16 @@ func (l *DataListener) Start() {
 
 		go l.handleConnection(conn)
 	}
+}
+
+func (l *DataListener) Start() error {
+	err := l.initSocket()
+
+	if err == nil {
+		go l.acceptConnections()
+	}
+
+	return err
 }
 
 func (l *DataListener) Stop() {
