@@ -6,7 +6,7 @@ import (
 	"syscall"
 	"flag"
 	"time"
-	"github.com/artd-status-updater/statusupdater"
+	"github.com/code-tool/artd-status-updater/statusupdater"
 )
 
 func parseArguments() (string, *status_updater.EtcdConnectionParams, *status_updater.KeyUpdaterParameters) {
