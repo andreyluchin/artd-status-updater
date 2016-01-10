@@ -15,15 +15,16 @@ func parseArguments() (string, *status_updater.EtcdConnectionParams, *status_upd
 	keyUpdaterParams := status_updater.KeyUpdaterParameters{}
 
 	// etcd connection params
-	flag.StringVar(&etcdParams.CertFile, "cert-file", "", "identify HTTPS client using this SSL certificate file")
-	flag.StringVar(&etcdParams.KeyFile, "key-file", "", "identify HTTPS client using this SSL key file")
-	flag.StringVar(&etcdParams.CaFile, "ca-file", "", "verify certificates of HTTPS-enabled servers using this CA bundle")
-	// StringVarP(Name: "username, u", Value: "", Usage: "provide username[:password] and prompt if password is not supplied.")
-	flag.DurationVar(&etcdParams.ConnectionTimeout, "timeout", time.Second, "connection timeout per request")
-	flag.DurationVar(&etcdParams.RequestTimeout, "total-timeout", 5 * time.Second, "timeout for the command execution")
+	flag.StringVar(&etcdParams.CertFile, "etcd-cert-file", "", "identify HTTPS client using this SSL certificate file")
+	flag.StringVar(&etcdParams.KeyFile, "etcd-key-file", "", "identify HTTPS client using this SSL key file")
+	flag.StringVar(&etcdParams.CaFile, "etcd-ca-file", "", "verify certificates of HTTPS-enabled servers using this CA bundle")
+	flag.StringVar(&etcdParams.Username, "etcd-user", "", "Etcd auth user")
+	flag.StringVar(&etcdParams.Password, "etcd-password", "", "Etcd auth password")
+	flag.DurationVar(&etcdParams.ConnectionTimeout, "etcd-timeout", time.Second, "etcd connection timeout per request")
+	flag.DurationVar(&etcdParams.RequestTimeout, "etcd-request-timeout", 5 * time.Second, "etcd requst timeout")
 
 	// Server socket path
-	flag.StringVar(&unixSocketPath, "socket", "/tmp/socket", "Path to unix socket liten on")
+	flag.StringVar(&unixSocketPath, "socket", "/tmp/artd-status-updater.sock", "Path to unix socket liten on")
 
 	// Key updater parameters
 	flag.StringVar(&keyUpdaterParams.Key, "key", "/artifact-downloader/status", "Key where to push status")
@@ -47,7 +48,7 @@ func main() {
 	dataChan := make(chan string)
 	errorChan := make(chan error)
 	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt, os.Kill, syscall.SIGTERM)
+	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
 
 	dataListener := status_updater.NewDataListener(unixSocketPath, dataChan, errorChan)
 	// start server
