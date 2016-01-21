@@ -15,6 +15,8 @@ func parseArguments() (string, *status_updater.EtcdConnectionParams, *status_upd
 	keyUpdaterParams := status_updater.KeyUpdaterParameters{}
 
 	// etcd connection params
+	flag.StringVar(&etcdParams.Endpoint, "etcd-endpoint", "http://127.0.0.1:4001,http://127.0.0.1:2379", "Coma separated etcd endpoints")
+	//
 	flag.StringVar(&etcdParams.CertFile, "etcd-cert-file", "", "identify HTTPS client using this SSL certificate file")
 	flag.StringVar(&etcdParams.KeyFile, "etcd-key-file", "", "identify HTTPS client using this SSL key file")
 	flag.StringVar(&etcdParams.CaFile, "etcd-ca-file", "", "verify certificates of HTTPS-enabled servers using this CA bundle")

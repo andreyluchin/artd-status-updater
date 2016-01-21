@@ -28,7 +28,7 @@ func getPeersFlagValue(params *EtcdConnectionParams) []string {
 	peerstr := params.Endpoint
 
 	if peerstr == "" {
-		peerstr = os.Getenv("ARTD_ST_ENDPOINT")
+		peerstr = os.Getenv("ARTD_ST_ETCD_ENDPOINT")
 	}
 
 	// If we still don't have peers, use a default
