@@ -7,6 +7,7 @@ import (
 	"flag"
 	"time"
 	"github.com/code-tool/artd-status-updater/statusupdater"
+	"runtime"
 )
 
 func parseArguments() (string, *status_updater.EtcdConnectionParams, *status_updater.KeyUpdaterParameters) {
@@ -40,6 +41,7 @@ func parseArguments() (string, *status_updater.EtcdConnectionParams, *status_upd
 }
 
 func main() {
+	runtime.GOMAXPROCS(1)
 	unixSocketPath, etcdParams, keyUpdaterParams := parseArguments()
 
 	etcdKApi, err := status_updater.MakeNewEtcdKApi(etcdParams)
